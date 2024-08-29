@@ -1,44 +1,55 @@
 ﻿using System;
 using Zenject;
-using System.Threading.Tasks;
 using System.IO;
 using Newtonsoft.Json;
 using SiraUtil.Logging;
+using CP_SDK.Chat;
 
 namespace BungOfflineRequest
 {
     public class BungRequestController : IInitializable
     {
         [Inject] private readonly SiraLog _log;
+        private Requests requests;
+        private string path;
+        private string jsonPath;
 
         public BungRequestController(SiraLog log)
         {
             _log = log;
         }
 
-        public async void Initialize()
+        public void Initialize()
         {
-            string path = Path.Combine(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), $".BungRequest/"));
-            string jsonPath = Path.Combine(path, "requests.json");
+            path = Path.Combine(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), $".BungRequest/"));
+            jsonPath = Path.Combine(path, "requests.json");
             if (!Directory.Exists(path))
             {
                 Directory.CreateDirectory(path);
-                _log.Info("Created directory .BungRequest in local application data");
+                _log.Info("Created directory \".BungRequest\" in local application data");
             }
             if (!File.Exists(jsonPath))
             {
                 File.WriteAllText(jsonPath, "{\r\n    \"maps\": [\r\n    ]\r\n}");
-                _log.Info("Created file requests.json in .BungRequest");
+                _log.Info("Created file \"requests.json\" in \".BungRequest\"");
             } 
-            Requests requests = JsonConvert.DeserializeObject<Requests>(File.ReadAllText(jsonPath));
-            await Task.Delay(10000); // Suuuuuurely best way to run after bs+ does things yesyes :3
+            requests = JsonConvert.DeserializeObject<Requests>(File.ReadAllText(jsonPath));
             if (requests.maps.Length > 0)
             {
+                Service.OnLoadingStateChanged += Service_OnLoadingStateChanged; // Returns false when loading is complete
+            }
+        }
+
+        private void Service_OnLoadingStateChanged(bool state)
+        {
+            if (!state)
+            {
+                Service.BroadcastMessage("BungOfflineRequest: Requesting maps :3c");
+                _log.Info("Requesting maps :3c");
                 foreach (var map in requests.maps)
                 {
-                    CP_SDK.Chat.Service.BroadcastMessage($"!bsr {map.bsr}");
+                    Service.BroadcastMessage($"!bsr {map.bsr}");
                     _log.Info($"Requested map {map.bsr}");
-                    await Task.Delay(200);
                 }
                 File.WriteAllText(jsonPath, "{\r\n    \"maps\": [\r\n    ]\r\n}");
             }
