@@ -7,14 +7,14 @@ namespace BungOfflineRequest
     [Plugin(RuntimeOptions.SingleStartInit)]
     public class Plugin
     {
-        private static IPALogger Logger;
+        private static IPALogger _logger;
 
         [Init]
         public void Init(IPALogger logger, Zenjector zenjector)
         {
-            Logger = logger;
+            _logger = logger;
             
-            zenjector.UseLogger(Logger);
+            zenjector.UseLogger(_logger);
             
             zenjector.Install(Location.Menu, container =>
             {

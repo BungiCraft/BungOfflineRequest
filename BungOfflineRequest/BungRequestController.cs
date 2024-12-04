@@ -1,18 +1,20 @@
 ﻿using System;
 using Zenject;
 using System.IO;
+using System.Threading.Tasks;
 using Newtonsoft.Json;
 using SiraUtil.Logging;
 using CP_SDK.Chat;
 
 namespace BungOfflineRequest
 {
+    // ReSharper disable once ClassNeverInstantiated.Global
     public class BungRequestController : IInitializable
     {
         [Inject] private readonly SiraLog _log;
-        private Requests requests;
-        private string path;
-        private string jsonPath;
+        private Requests _requests;
+        private string _path;
+        private string _jsonPath;
 
         public BungRequestController(SiraLog log)
         {
@@ -21,60 +23,68 @@ namespace BungOfflineRequest
 
         public void Initialize()
         {
-            path = Path.Combine(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), $".BungRequest/"));
-            jsonPath = Path.Combine(path, "requests.json");
-            if (!Directory.Exists(path))
+            _path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), $".BungRequest/");
+            _jsonPath = Path.Combine(_path, "requests.json");
+            if (!Directory.Exists(_path))
             {
-                Directory.CreateDirectory(path);
+                Directory.CreateDirectory(_path);
                 _log.Info("Created directory \".BungRequest\" in local application data");
             }
-            if (!File.Exists(jsonPath))
+            if (!File.Exists(_jsonPath))
             {
-                File.WriteAllText(jsonPath, "{\r\n    \"maps\": [\r\n    ]\r\n}");
+                File.WriteAllText(_jsonPath, "{\r\n    \"maps\": [\r\n    ]\r\n}");
                 _log.Info("Created file \"requests.json\" in \".BungRequest\"");
             } 
-            requests = JsonConvert.DeserializeObject<Requests>(File.ReadAllText(jsonPath));
-            if (requests.maps.Length > 0)
+            _requests = JsonConvert.DeserializeObject<Requests>(File.ReadAllText(_jsonPath));
+            if (_requests.Maps.Length > 0)
             {
                 Service.OnLoadingStateChanged += Service_OnLoadingStateChanged; // Returns false when loading is complete
             }
         }
 
-        private void Service_OnLoadingStateChanged(bool state)
+        private async void Service_OnLoadingStateChanged(bool state)
         {
-            if (!state)
+            try
             {
+                if (state) return;
                 Service.BroadcastMessage("BungOfflineRequest: Requesting maps :3c");
                 _log.Info("Requesting maps :3c");
-                foreach (var map in requests.maps)
+                await Task.Delay(5000); // Add 5-second delay to ensure that bs+ has loaded mod perms or smth
+                foreach (var map in _requests.Maps)
                 {
-                    Service.BroadcastMessage($"!bsr {map.bsr}");
-                    _log.Info($"Requested map {map.bsr}");
+                    Service.BroadcastMessage($"!modadd {map.Bsr}");
+                    _log.Info($"Requested map {map.Bsr}");
+                    await Task.Delay(500); // Add .5-second delay between requests to make them look less "spammy"
                 }
-                File.WriteAllText(jsonPath, "{\r\n    \"maps\": [\r\n    ]\r\n}");
+                File.WriteAllText(_jsonPath, "{\r\n    \"maps\": [\r\n    ]\r\n}");
+            }
+            catch (Exception e)
+            {
+                _log.Error(e);
             }
         }
     }
 
     public class Requests
     {
-        public Map[] maps;
+        public readonly Map[] Maps;
 
         public Requests(Map[] maps)
         {
-            this.maps = maps;
+            Maps = maps;
         }
     }
 
+    // ReSharper disable once ClassNeverInstantiated.Global
     public class Map
     {
-        public string name;
-        public string bsr;
+        public readonly string Name;
+        public readonly string Bsr;
 
         public Map(string name, string bsr)
         {
-            this.name = name;
-            this.bsr = bsr;
+            Name = name;
+            Bsr = bsr;
         }
     }
 }
